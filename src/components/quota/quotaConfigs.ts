@@ -765,13 +765,14 @@ const renderClaudeItems = (
   }
 
   // OAuth rolling window usage (5h / 7d) — shown for OAuth accounts
+  // Display USED percentage (matching CRS behavior) in label, but bar shows inverted (remaining)
   if (quota.oauthWindows && quota.oauthWindows.length > 0) {
     nodes.push(
       ...quota.oauthWindows.map((window) => {
         const used = window.usedPercent;
         const clampedUsed = used === null ? null : Math.max(0, Math.min(100, used));
-        const remaining = clampedUsed === null ? null : Math.max(0, Math.min(100, 100 - clampedUsed));
-        const percentLabel = remaining === null ? '--' : `${Math.round(remaining)}%`;
+        const remaining = clampedUsed === null ? null : 100 - clampedUsed;
+        const percentLabel = clampedUsed === null ? '--' : `${Math.round(clampedUsed)}%`;
         const windowLabel = t(window.labelKey);
         const resetLabel = window.resetsAt ? formatQuotaResetTime(window.resetsAt) : '-';
 
