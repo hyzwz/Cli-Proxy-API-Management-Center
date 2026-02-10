@@ -147,6 +147,21 @@ export interface CodexQuotaState {
 }
 
 // Claude quota types
+export interface ClaudeOAuthUsage {
+  five_hour_utilization?: string;
+  fiveHourUtilization?: string;
+  five_hour_resets_at?: string;
+  fiveHourResetsAt?: string;
+  seven_day_utilization?: string;
+  sevenDayUtilization?: string;
+  seven_day_resets_at?: string;
+  sevenDayResetsAt?: string;
+  seven_day_sonnet_util?: string;
+  sevenDaySonnetUtil?: string;
+  seven_day_sonnet_resets?: string;
+  sevenDaySonnetResets?: string;
+}
+
 export interface ClaudeQuotaPayload {
   auth_file?: string;
   authFile?: string;
@@ -184,8 +199,17 @@ export interface ClaudeQuotaPayload {
     requests_remaining?: number | string;
     requestsRemaining?: number | string;
   };
+  oauth_usage?: ClaudeOAuthUsage;
+  oauthUsage?: ClaudeOAuthUsage;
   last_updated?: string;
   lastUpdated?: string;
+}
+
+export interface ClaudeOAuthWindow {
+  id: string;
+  labelKey: string;
+  usedPercent: number | null;
+  resetsAt?: string;
 }
 
 export interface ClaudeQuotaState {
@@ -200,6 +224,7 @@ export interface ClaudeQuotaState {
   resetDate?: string;
   requestsLimit?: number;
   requestsRemaining?: number;
+  oauthWindows?: ClaudeOAuthWindow[];
   error?: string;
   errorStatus?: number;
 }

@@ -488,7 +488,10 @@
     "rate_limit_label": "速率限制",
     "requests_per_minute": "请求/分钟",
     "refresh_button": "刷新额度",
-    "fetch_all": "获取全部"
+    "fetch_all": "获取全部",
+    "five_hour_window": "5小时窗口",
+    "seven_day_window": "7天窗口",
+    "seven_day_sonnet_window": "7天 Sonnet"
   },
   "vertex_import": {
     "title": "Vertex JSON 登录",

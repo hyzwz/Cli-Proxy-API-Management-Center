@@ -20,6 +20,7 @@ import type {
   GeminiCliQuotaState,
   ClaudeQuotaPayload,
   ClaudeQuotaState,
+  ClaudeOAuthWindow,
 } from '@/types';
 import { apiCallApi, authFilesApi, getApiCallErrorMessage } from '@/services/api';
 import {
@@ -650,9 +651,16 @@ const fetchClaudeQuota = async (
   }
 };
 
+const parseOAuthUtilization = (raw: string | undefined): number | null => {
+  if (!raw) return null;
+  const val = parseFloat(raw.replace('%', ''));
+  return isNaN(val) ? null : val;
+};
+
 const parseClaudeQuotaPayload = (payload: ClaudeQuotaPayload): ClaudeQuotaState => {
   const quota = payload.quota ?? {};
   const rateLimit = payload.rate_limit ?? payload.rateLimit ?? {};
+  const oauthUsage = payload.oauth_usage ?? payload.oauthUsage ?? null;
 
   const monthlyQuota = normalizeNumberValue(quota.monthly_quota ?? quota.monthlyQuota);
   const usedQuota = normalizeNumberValue(quota.used_quota ?? quota.usedQuota);
@@ -660,6 +668,46 @@ const parseClaudeQuotaPayload = (payload: ClaudeQuotaPayload): ClaudeQuotaState 
 
   const percentageStr = normalizeStringValue(quota.quota_percentage ?? quota.quotaPercentage);
   const quotaPercentage = percentageStr ? parseFloat(percentageStr.replace('%', '')) : null;
+
+  // Parse OAuth rolling window usage
+  let oauthWindows: ClaudeOAuthWindow[] | undefined;
+  if (oauthUsage) {
+    oauthWindows = [];
+    const fiveHourUtil = parseOAuthUtilization(
+      normalizeStringValue(oauthUsage.five_hour_utilization ?? oauthUsage.fiveHourUtilization) ?? undefined
+    );
+    const sevenDayUtil = parseOAuthUtilization(
+      normalizeStringValue(oauthUsage.seven_day_utilization ?? oauthUsage.sevenDayUtilization) ?? undefined
+    );
+    const sevenDaySonnetUtil = parseOAuthUtilization(
+      normalizeStringValue(oauthUsage.seven_day_sonnet_util ?? oauthUsage.sevenDaySonnetUtil) ?? undefined
+    );
+
+    if (fiveHourUtil !== null) {
+      oauthWindows.push({
+        id: 'five-hour',
+        labelKey: 'claude_quota.five_hour_window',
+        usedPercent: fiveHourUtil,
+        resetsAt: normalizeStringValue(oauthUsage.five_hour_resets_at ?? oauthUsage.fiveHourResetsAt) ?? undefined,
+      });
+    }
+    if (sevenDayUtil !== null) {
+      oauthWindows.push({
+        id: 'seven-day',
+        labelKey: 'claude_quota.seven_day_window',
+        usedPercent: sevenDayUtil,
+        resetsAt: normalizeStringValue(oauthUsage.seven_day_resets_at ?? oauthUsage.sevenDayResetsAt) ?? undefined,
+      });
+    }
+    if (sevenDaySonnetUtil !== null) {
+      oauthWindows.push({
+        id: 'seven-day-sonnet',
+        labelKey: 'claude_quota.seven_day_sonnet_window',
+        usedPercent: sevenDaySonnetUtil,
+        resetsAt: normalizeStringValue(oauthUsage.seven_day_sonnet_resets ?? oauthUsage.sevenDaySonnetResets) ?? undefined,
+      });
+    }
+  }
 
   return {
     status: 'success',
@@ -679,6 +727,7 @@ const parseClaudeQuotaPayload = (payload: ClaudeQuotaPayload): ClaudeQuotaState 
     requestsRemaining: normalizeNumberValue(
       rateLimit.requests_remaining ?? rateLimit.requestsRemaining
     ) ?? undefined,
+    oauthWindows: oauthWindows && oauthWindows.length > 0 ? oauthWindows : undefined,
   };
 };
 
@@ -715,8 +764,37 @@ const renderClaudeItems = (
     );
   }
 
-  // Monthly quota bar
-  if (quota.monthlyQuota !== undefined && quota.remainingQuota !== undefined) {
+  // OAuth rolling window usage (5h / 7d) — shown for OAuth accounts
+  if (quota.oauthWindows && quota.oauthWindows.length > 0) {
+    nodes.push(
+      ...quota.oauthWindows.map((window) => {
+        const used = window.usedPercent;
+        const clampedUsed = used === null ? null : Math.max(0, Math.min(100, used));
+        const remaining = clampedUsed === null ? null : Math.max(0, Math.min(100, 100 - clampedUsed));
+        const percentLabel = remaining === null ? '--' : `${Math.round(remaining)}%`;
+        const windowLabel = t(window.labelKey);
+        const resetLabel = window.resetsAt ? formatQuotaResetTime(window.resetsAt) : '-';
+
+        return h(
+          'div',
+          { key: window.id, className: styleMap.quotaRow },
+          h(
+            'div',
+            { className: styleMap.quotaRowHeader },
+            h('span', { className: styleMap.quotaModel }, windowLabel),
+            h(
+              'div',
+              { className: styleMap.quotaMeta },
+              h('span', { className: styleMap.quotaPercent }, percentLabel),
+              h('span', { className: styleMap.quotaReset }, resetLabel)
+            )
+          ),
+          h(QuotaProgressBar, { percent: remaining, highThreshold: 60, mediumThreshold: 20 })
+        );
+      })
+    );
+  } else if (quota.monthlyQuota !== undefined && quota.remainingQuota !== undefined) {
+    // Fallback: monthly quota bar for API key accounts
     const remaining = Math.max(0, quota.remainingQuota);
     const total = Math.max(1, quota.monthlyQuota);
     const remainingPercent = Math.round((remaining / total) * 100);
@@ -727,9 +805,7 @@ const renderClaudeItems = (
       return `${value}`;
     };
 
-    const resetLabel = quota.resetDate
-      ? formatQuotaResetTime(quota.resetDate)
-      : '-';
+    const resetLabel = quota.resetDate ? formatQuotaResetTime(quota.resetDate) : '-';
 
     nodes.push(
       h(
@@ -750,16 +826,8 @@ const renderClaudeItems = (
         h(
           'div',
           { className: styleMap.quotaDetails },
-          h(
-            'span',
-            null,
-            `${t('claude_quota.used_label')}: ${formatTokens(quota.usedQuota ?? 0)}`
-          ),
-          h(
-            'span',
-            null,
-            `${t('claude_quota.remaining_label')}: ${formatTokens(remaining)}`
-          )
+          h('span', null, `${t('claude_quota.used_label')}: ${formatTokens(quota.usedQuota ?? 0)}`),
+          h('span', null, `${t('claude_quota.remaining_label')}: ${formatTokens(remaining)}`)
         )
       )
     );

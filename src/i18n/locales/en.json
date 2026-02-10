@@ -488,7 +488,10 @@
     "rate_limit_label": "Rate Limit",
     "requests_per_minute": "requests/min",
     "refresh_button": "Refresh Quota",
-    "fetch_all": "Fetch All"
+    "fetch_all": "Fetch All",
+    "five_hour_window": "5-Hour Window",
+    "seven_day_window": "7-Day Window",
+    "seven_day_sonnet_window": "7-Day Sonnet"
   },
   "vertex_import": {
     "title": "Vertex JSON Login",
