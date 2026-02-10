@@ -18,6 +18,8 @@ import type {
   GeminiCliParsedBucket,
   GeminiCliQuotaBucketState,
   GeminiCliQuotaState,
+  ClaudeQuotaPayload,
+  ClaudeQuotaState,
 } from '@/types';
 import { apiCallApi, authFilesApi, getApiCallErrorMessage } from '@/services/api';
 import {
@@ -47,6 +49,7 @@ import {
   getStatusFromError,
   isAntigravityFile,
   isCodexFile,
+  isClaudeFile,
   isDisabledAuthFile,
   isGeminiCliFile,
   isRuntimeOnlyAuthFile,
@@ -56,7 +59,7 @@ import styles from '@/pages/QuotaPage.module.scss';
 
 type QuotaUpdater<T> = T | ((prev: T) => T);
 
-type QuotaType = 'antigravity' | 'codex' | 'gemini-cli';
+type QuotaType = 'antigravity' | 'codex' | 'gemini-cli' | 'claude';
 
 const DEFAULT_ANTIGRAVITY_PROJECT_ID = 'bamboo-precept-lgxtn';
 
@@ -64,9 +67,11 @@ export interface QuotaStore {
   antigravityQuota: Record<string, AntigravityQuotaState>;
   codexQuota: Record<string, CodexQuotaState>;
   geminiCliQuota: Record<string, GeminiCliQuotaState>;
+  claudeQuota: Record<string, ClaudeQuotaState>;
   setAntigravityQuota: (updater: QuotaUpdater<Record<string, AntigravityQuotaState>>) => void;
   setCodexQuota: (updater: QuotaUpdater<Record<string, CodexQuotaState>>) => void;
   setGeminiCliQuota: (updater: QuotaUpdater<Record<string, GeminiCliQuotaState>>) => void;
+  setClaudeQuota: (updater: QuotaUpdater<Record<string, ClaudeQuotaState>>) => void;
   clearQuotaCache: () => void;
 }
 
@@ -630,4 +635,176 @@ export const GEMINI_CLI_CONFIG: QuotaConfig<GeminiCliQuotaState, GeminiCliQuotaB
   controlClassName: styles.geminiCliControl,
   gridClassName: styles.geminiCliGrid,
   renderQuotaItems: renderGeminiCliItems,
+};
+
+const fetchClaudeQuota = async (
+  file: AuthFileItem,
+  t: TFunction
+): Promise<ClaudeQuotaPayload> => {
+  try {
+    const response = await authFilesApi.getQuota(file.name);
+    return response as ClaudeQuotaPayload;
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : t('common.unknown_error');
+    throw new Error(errorMessage);
+  }
+};
+
+const parseClaudeQuotaPayload = (payload: ClaudeQuotaPayload): ClaudeQuotaState => {
+  const quota = payload.quota ?? {};
+  const rateLimit = payload.rate_limit ?? payload.rateLimit ?? {};
+
+  const monthlyQuota = normalizeNumberValue(quota.monthly_quota ?? quota.monthlyQuota);
+  const usedQuota = normalizeNumberValue(quota.used_quota ?? quota.usedQuota);
+  const remainingQuota = normalizeNumberValue(quota.remaining_quota ?? quota.remainingQuota);
+
+  const percentageStr = normalizeStringValue(quota.quota_percentage ?? quota.quotaPercentage);
+  const quotaPercentage = percentageStr ? parseFloat(percentageStr.replace('%', '')) : null;
+
+  return {
+    status: 'success',
+    email: normalizeStringValue(payload.email) ?? undefined,
+    organizationName: normalizeStringValue(
+      payload.organization_name ?? payload.organizationName
+    ) ?? undefined,
+    planType: normalizeStringValue(payload.plan_type ?? payload.planType) ?? undefined,
+    monthlyQuota: monthlyQuota ?? undefined,
+    usedQuota: usedQuota ?? undefined,
+    remainingQuota: remainingQuota ?? undefined,
+    quotaPercentage: quotaPercentage ?? undefined,
+    resetDate: normalizeStringValue(quota.reset_date ?? quota.resetDate) ?? undefined,
+    requestsLimit: normalizeNumberValue(
+      rateLimit.requests_limit ?? rateLimit.requestsLimit
+    ) ?? undefined,
+    requestsRemaining: normalizeNumberValue(
+      rateLimit.requests_remaining ?? rateLimit.requestsRemaining
+    ) ?? undefined,
+  };
+};
+
+const renderClaudeItems = (
+  quota: ClaudeQuotaState,
+  t: TFunction,
+  helpers: QuotaRenderHelpers
+): ReactNode => {
+  const { styles: styleMap, QuotaProgressBar } = helpers;
+  const { createElement: h, Fragment } = React;
+  const nodes: ReactNode[] = [];
+
+  // Email and plan info
+  if (quota.email || quota.planType) {
+    nodes.push(
+      h(
+        'div',
+        { key: 'info', className: styleMap.codexPlan },
+        quota.email &&
+          h(
+            'div',
+            { className: styleMap.claudeInfo },
+            h('span', { className: styleMap.codexPlanLabel }, t('claude_quota.email_label')),
+            h('span', { className: styleMap.codexPlanValue }, quota.email)
+          ),
+        quota.planType &&
+          h(
+            'div',
+            { className: styleMap.claudeInfo },
+            h('span', { className: styleMap.codexPlanLabel }, t('claude_quota.plan_label')),
+            h('span', { className: styleMap.codexPlanValue }, quota.planType)
+          )
+      )
+    );
+  }
+
+  // Monthly quota bar
+  if (quota.monthlyQuota !== undefined && quota.remainingQuota !== undefined) {
+    const remaining = Math.max(0, quota.remainingQuota);
+    const total = Math.max(1, quota.monthlyQuota);
+    const remainingPercent = Math.round((remaining / total) * 100);
+
+    const formatTokens = (value: number): string => {
+      if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+      if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
+      return `${value}`;
+    };
+
+    const resetLabel = quota.resetDate
+      ? formatQuotaResetTime(quota.resetDate)
+      : '-';
+
+    nodes.push(
+      h(
+        'div',
+        { key: 'quota', className: styleMap.quotaRow },
+        h(
+          'div',
+          { className: styleMap.quotaRowHeader },
+          h('span', { className: styleMap.quotaModel }, t('claude_quota.monthly_quota')),
+          h(
+            'div',
+            { className: styleMap.quotaMeta },
+            h('span', { className: styleMap.quotaPercent }, `${remainingPercent}%`),
+            h('span', { className: styleMap.quotaReset }, resetLabel)
+          )
+        ),
+        h(QuotaProgressBar, { percent: remainingPercent, highThreshold: 60, mediumThreshold: 20 }),
+        h(
+          'div',
+          { className: styleMap.quotaDetails },
+          h(
+            'span',
+            null,
+            `${t('claude_quota.used_label')}: ${formatTokens(quota.usedQuota ?? 0)}`
+          ),
+          h(
+            'span',
+            null,
+            `${t('claude_quota.remaining_label')}: ${formatTokens(remaining)}`
+          )
+        )
+      )
+    );
+  }
+
+  // Rate limit info
+  if (quota.requestsLimit !== undefined || quota.requestsRemaining !== undefined) {
+    nodes.push(
+      h(
+        'div',
+        { key: 'rate-limit', className: styleMap.claudeRateLimit },
+        h('span', { className: styleMap.codexPlanLabel }, t('claude_quota.rate_limit_label')),
+        h(
+          'span',
+          { className: styleMap.codexPlanValue },
+          `${quota.requestsRemaining ?? 0} / ${quota.requestsLimit ?? 0} ${t('claude_quota.requests_per_minute')}`
+        )
+      )
+    );
+  }
+
+  if (nodes.length === 0) {
+    return h('div', { className: styleMap.quotaMessage }, t('claude_quota.no_data'));
+  }
+
+  return h(Fragment, null, ...nodes);
+};
+
+export const CLAUDE_CONFIG: QuotaConfig<ClaudeQuotaState, ClaudeQuotaPayload> = {
+  type: 'claude',
+  i18nPrefix: 'claude_quota',
+  filterFn: (file) => isClaudeFile(file) && !isDisabledAuthFile(file),
+  fetchQuota: fetchClaudeQuota,
+  storeSelector: (state) => state.claudeQuota,
+  storeSetter: 'setClaudeQuota',
+  buildLoadingState: () => ({ status: 'loading' }),
+  buildSuccessState: parseClaudeQuotaPayload,
+  buildErrorState: (message, status) => ({
+    status: 'error',
+    error: message,
+    errorStatus: status,
+  }),
+  cardClassName: styles.claudeCard,
+  controlsClassName: styles.claudeControls,
+  controlClassName: styles.claudeControl,
+  gridClassName: styles.claudeGrid,
+  renderQuotaItems: renderClaudeItems,
 };

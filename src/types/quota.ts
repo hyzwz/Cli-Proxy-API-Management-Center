@@ -145,3 +145,61 @@ export interface CodexQuotaState {
   error?: string;
   errorStatus?: number;
 }
+
+// Claude quota types
+export interface ClaudeQuotaPayload {
+  auth_file?: string;
+  authFile?: string;
+  provider?: string;
+  email?: string;
+  organization_id?: string;
+  organizationId?: string;
+  organization_name?: string;
+  organizationName?: string;
+  plan_type?: string;
+  planType?: string;
+  quota?: {
+    monthly_quota?: number | string;
+    monthlyQuota?: number | string;
+    used_quota?: number | string;
+    usedQuota?: number | string;
+    remaining_quota?: number | string;
+    remainingQuota?: number | string;
+    quota_percentage?: string;
+    quotaPercentage?: string;
+    reset_date?: string;
+    resetDate?: string;
+    reset_time?: number | string;
+    resetTime?: number | string;
+  };
+  rate_limit?: {
+    requests_limit?: number | string;
+    requestsLimit?: number | string;
+    requests_remaining?: number | string;
+    requestsRemaining?: number | string;
+  };
+  rateLimit?: {
+    requests_limit?: number | string;
+    requestsLimit?: number | string;
+    requests_remaining?: number | string;
+    requestsRemaining?: number | string;
+  };
+  last_updated?: string;
+  lastUpdated?: string;
+}
+
+export interface ClaudeQuotaState {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  email?: string;
+  organizationName?: string;
+  planType?: string;
+  monthlyQuota?: number;
+  usedQuota?: number;
+  remainingQuota?: number;
+  quotaPercentage?: number;
+  resetDate?: string;
+  requestsLimit?: number;
+  requestsRemaining?: number;
+  error?: string;
+  errorStatus?: number;
+}

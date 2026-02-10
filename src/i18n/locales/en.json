@@ -470,6 +470,26 @@
     "fetch_all": "Fetch All",
     "remaining_amount": "Remaining {{count}}"
   },
+  "claude_quota": {
+    "title": "Claude / Anthropic Quota",
+    "empty_title": "No Claude Auth Files",
+    "empty_desc": "Upload a Claude OAuth credential to view remaining quota.",
+    "idle": "Click here to refresh quota",
+    "loading": "Loading quota...",
+    "load_failed": "Failed to load quota: {{message}}",
+    "no_data": "No quota data available",
+    "email_label": "Account",
+    "plan_label": "Plan",
+    "monthly_quota": "Monthly Quota",
+    "used": "Used: {{count}}",
+    "remaining": "Remaining: {{count}}",
+    "used_label": "Used",
+    "remaining_label": "Remaining",
+    "rate_limit_label": "Rate Limit",
+    "requests_per_minute": "requests/min",
+    "refresh_button": "Refresh Quota",
+    "fetch_all": "Fetch All"
+  },
   "vertex_import": {
     "title": "Vertex JSON Login",
     "description": "Upload a Google service account JSON to store it as auth-dir/vertex-<project>.json using the same rules as the CLI vertex-import helper.",

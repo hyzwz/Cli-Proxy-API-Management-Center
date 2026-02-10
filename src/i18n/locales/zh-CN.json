@@ -470,6 +470,26 @@
     "fetch_all": "获取全部",
     "remaining_amount": "剩余 {{count}}"
   },
+  "claude_quota": {
+    "title": "Claude / Anthropic 额度",
+    "empty_title": "暂无 Claude 认证",
+    "empty_desc": "上传 Claude OAuth 认证文件后即可查看额度。",
+    "idle": "点击此处刷新额度",
+    "loading": "正在加载额度...",
+    "load_failed": "额度获取失败：{{message}}",
+    "no_data": "暂无配额数据",
+    "email_label": "账户",
+    "plan_label": "套餐",
+    "monthly_quota": "月度配额",
+    "used": "已用：{{count}}",
+    "remaining": "剩余：{{count}}",
+    "used_label": "已用",
+    "remaining_label": "剩余",
+    "rate_limit_label": "速率限制",
+    "requests_per_minute": "请求/分钟",
+    "refresh_button": "刷新额度",
+    "fetch_all": "获取全部"
+  },
   "vertex_import": {
     "title": "Vertex JSON 登录",
     "description": "上传 Google 服务账号 JSON，使用 CLI vertex-import 同步规则写入 auth-dir/vertex-<project>.json。",

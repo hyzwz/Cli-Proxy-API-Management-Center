@@ -191,5 +191,9 @@ export const authFilesApi = {
     return Array.isArray(models)
       ? (models as { id: string; display_name?: string; type?: string; owned_by?: string }[])
       : [];
-  }
+  },
+
+  // 获取认证文件配额信息（Claude/Anthropic OAuth）
+  getQuota: (name: string) =>
+    apiClient.get(`/auth-files/quota?name=${encodeURIComponent(name)}`)
 };
