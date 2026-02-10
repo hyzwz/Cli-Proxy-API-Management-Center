@@ -21,24 +21,35 @@ export interface QuotaProgressBarProps {
   percent: number | null;
   highThreshold: number;
   mediumThreshold: number;
+  inverted?: boolean;
 }
 
 export function QuotaProgressBar({
   percent,
   highThreshold,
-  mediumThreshold
+  mediumThreshold,
+  inverted = false
 }: QuotaProgressBarProps) {
   const clamp = (value: number, min: number, max: number) =>
     Math.min(max, Math.max(min, value));
   const normalized = percent === null ? null : clamp(percent, 0, 100);
+
+  // For inverted mode (used% display), flip the color logic:
+  // high usage (>= highThreshold) = red (bad), low usage (< mediumThreshold) = green (good)
   const fillClass =
     normalized === null
       ? styles.quotaBarFillMedium
-      : normalized >= highThreshold
-        ? styles.quotaBarFillHigh
-        : normalized >= mediumThreshold
-          ? styles.quotaBarFillMedium
-          : styles.quotaBarFillLow;
+      : inverted
+        ? (normalized >= highThreshold
+            ? styles.quotaBarFillLow      // high usage = red
+            : normalized >= mediumThreshold
+              ? styles.quotaBarFillMedium // medium usage = yellow
+              : styles.quotaBarFillHigh)  // low usage = green
+        : (normalized >= highThreshold
+            ? styles.quotaBarFillHigh     // high remaining = green
+            : normalized >= mediumThreshold
+              ? styles.quotaBarFillMedium // medium remaining = yellow
+              : styles.quotaBarFillLow);  // low remaining = red
   const widthPercent = Math.round(normalized ?? 0);
 
   return (
